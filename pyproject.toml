@@ -1,0 +1,9 @@
+# Configuração do pytest. O projeto não é instalado como pacote:
+# os testes e o servidor rodam a partir da raiz do repositório.
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra --strict-markers"
+markers = [
+    "base_real: testes de validação controlada contra Database/SQLite/db_proj_final.db (somente leitura)",
+]
