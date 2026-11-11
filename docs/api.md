@@ -35,6 +35,7 @@ O caminho do banco tem esta prioridade: `--banco`, depois a variável `ORCAMENTO
 - `ano` é inteiro de 4 dígitos.
 - `limite` tem padrão 50 e máximo 200.
 - `modelo` precisa ter ao menos um caractere que não seja espaço.
+- Códigos (`codigo_aplicacao`, `codigo_produto`, `grupo`) vão de 1 a 2^63−1.
 - Parâmetro inválido devolve **422**. Código inexistente devolve **404**.
 
 ## Formato das respostas
@@ -130,6 +131,10 @@ Sem `chave_motor`, a mesma busca traz também as bronzinas do motor 2.8 SPRINT, 
 | `MOTORIZACAO_NAO_INTERPRETADA` | Motorização sem cilindrada reconhecível. |
 | `COMBUSTIVEL_CONFLITANTE` | Mesmo motor com combustíveis diferentes para o mesmo modelo e ano. |
 | `PRECO_AUSENTE` | Peça sem preço na base. |
+| `PRECO_SUSPEITO` | Preço zerado ou negativo. O critério para outros casos suspeitos é a pendência P16. |
+| `PECAS_NAO_ENCONTRADAS` | O veículo foi encontrado, mas nenhuma peça vinculada atende aos filtros. O contexto traz as aplicações consultadas, o `grupo` e o `texto`. |
+| `CORRESPONDENCIA_PARCIAL_MODELO` | O modelo só foi achado no meio da descrição (confiança baixa). |
+| `DADO_AUSENTE` | Outro valor nulo, por exemplo `QtdEmbalagem`. |
 | `POSSIVEL_PRODUTO_DUPLICADO` | Mesma descrição e mesmo número-base (sem `#NAC_`). Os produtos não são mesclados. |
 | `VINCULO_ORFAO` | Vínculo peça × aplicação aponta para uma aplicação inexistente. |
 | `REFERENCIA_INEXISTENTE` | Chave estrangeira aponta para um registro inexistente. |
@@ -141,15 +146,17 @@ Sem `chave_motor`, a mesma busca traz também as bronzinas do motor 2.8 SPRINT, 
 | `MOTOR_NAO_IDENTIFICADO` | Há mais de um motor candidato. Em `/v1/pecas`, a severidade sobe para **revisão**. |
 | `MULTIPLOS_COMBUSTIVEIS` | Há mais de um combustível para o modelo e ano. |
 | `DESCRICAO_COMPOSTA` | A descrição reúne vários itens (`/` ou `<br>`). |
-| `CORRESPONDENCIA_PARCIAL_MODELO` | O modelo só foi achado no meio da descrição (confiança baixa). |
 | `MODELO_NAO_ENCONTRADO` | Nenhuma aplicação para o modelo. O contexto traz `modelos_disponiveis`. |
 | `ANO_FORA_DO_INTERVALO` | O modelo existe, mas não no ano pedido. O contexto traz `faixas_disponiveis`. |
 | `COMBUSTIVEL_NAO_ENCONTRADO` | Modelo e ano existem, mas não com esse combustível. O contexto traz os disponíveis. |
 | `MOTOR_NAO_ENCONTRADO` | Nenhuma aplicação com a `chave_motor` informada. O contexto traz as chaves disponíveis. |
 | `FABRICANTE_NAO_ENCONTRADO` | Fabricante desconhecido. O contexto traz os fabricantes disponíveis. |
 | `FABRICANTE_SEM_VEICULOS` | O fabricante existe, mas não tem aplicações na base. |
-| `DADO_AUSENTE` | Outro valor nulo, por exemplo `QtdEmbalagem`. |
 
 Alertas do mesmo código aparecem uma única vez por resposta. As evidências e as listas do contexto são unidas.
+
+O filtro `combustivel` **não esconde conflitos**. O conflito de combustível é procurado nas aplicações do modelo e ano sem esse filtro, restrito aos motores que sobraram depois dele. Por exemplo, um Kicks 2018 a gasolina continua com `COMBUSTIVEL_CONFLITANTE`, porque o mesmo motor aparece também como FLEX.
+
+O Swagger mostra exemplos com valores reais da base nos componentes das respostas (`Evidencia`, `ValorRastreado`, `Alerta`, `RevisaoHumana`, `Fonte`, `MotorNormalizado`, `DadosSaude`…).
 
 As regras de normalização e de correspondência estão em [dados.md](dados.md).

@@ -216,3 +216,21 @@ def test_buscar_paginacao_deterministica(servico):
     assert r.total == 17
     assert (r.pagina, r.limite) == (2, 5)
     assert [a.codigo_aplicacao for a in r.dados] == [13823, 13824, 13979, 31393, 32415]
+
+
+# --- regressões da revisão final -------------------------------------------------------
+
+
+def test_filtro_de_combustivel_nao_esconde_conflito(servico):
+    """C1: o combustível informado não pode resolver em silêncio o conflito FLEX × GASOLINA do mesmo motor."""
+    r = servico.motorizacoes("kicks", 2018, combustivel="gasolina")
+    assert r.dados.identificado is True
+    conflito = alerta(r, CodigoAlerta.COMBUSTIVEL_CONFLITANTE)
+    assert any(e.chave == {"CodigoAplicacao": 31383} and e.valor_original == "FLEX" for e in conflito.evidencias)
+    assert CodigoAlerta.COMBUSTIVEL_CONFLITANTE in r.revisao_humana.motivos
+
+
+def test_correspondencia_parcial_exige_revisao(servico):
+    """I2: baixa confiança exige revisão humana (CLAUDE.md)."""
+    r = servico.motorizacoes("SE", 2008)
+    assert CodigoAlerta.CORRESPONDENCIA_PARCIAL_MODELO in r.revisao_humana.motivos

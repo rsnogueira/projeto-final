@@ -222,6 +222,27 @@ class ServicoVeiculos:
             pares = filtrados
         return pares, alertas
 
+    def conflitos_no_contexto(
+        self,
+        aplicacoes: list[Aplicacao],
+        modelo: str | None,
+        ano: int | None,
+        fabricante: str | None,
+        combustivel: str | None,
+        chave_motor: str | None = None,
+    ) -> list[Alerta]:
+        """Conflitos de combustível calculados ANTES do filtro de combustível.
+
+        O combustível informado pelo comprador não pode resolver em silêncio um conflito da base: o conflito
+        é procurado no conjunto sem esse filtro, restrito às chaves de motor que sobraram depois dele.
+        """
+        if not normalizar_texto(combustivel):
+            return alertas_conflito_combustivel(aplicacoes)
+        chaves = {a.motorizacao.normalizado.chave for a in aplicacoes}
+        pares, _ = self.resolver_aplicacoes(modelo, ano, fabricante, None, chave_motor)
+        contexto = [self.montar_aplicacao(linha, c)[0] for linha, c in pares]
+        return alertas_conflito_combustivel([a for a in contexto if a.motorizacao.normalizado.chave in chaves])
+
     @staticmethod
     def consulta_veiculo(modelo, ano, fabricante, combustivel) -> dict[str, ParametroEcoado]:
         return {
@@ -246,7 +267,7 @@ class ServicoVeiculos:
                 [c.motorizacoes_originais[0].evidencia for c in candidatos],
                 chaves_candidatas=[c.chave_motor for c in candidatos],
             ))
-        alertas += alertas_conflito_combustivel(aplicacoes)
+        alertas += self.conflitos_no_contexto(aplicacoes, modelo, ano, fabricante, combustivel)
         dados = DadosMotorizacoes(
             identificado=identificado,
             motor_identificado=candidatos[0] if identificado else None,

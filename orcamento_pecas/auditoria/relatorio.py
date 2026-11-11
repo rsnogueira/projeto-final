@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from orcamento_pecas.auditoria.amostragem import ItemAmostra
 from orcamento_pecas.auditoria.verificacoes import Falha
 from orcamento_pecas.dominio.modelos import Alerta
+from orcamento_pecas.dominio.normalizacao import normalizar_texto
 
 ABAS = ("Resumo", "Falhas", "Alertas_base", "Amostra_revisao", "Metadados")
 COLUNAS_REVISOR = ("Conferido (S/N)", "Divergência", "Comentário", "Revisor", "Data")
@@ -55,6 +56,7 @@ class ResumoRevisao(BaseModel):
     conferidos: list[str]
     divergencias: list[str]
     pendentes: list[str]
+    invalidos: list[str] = []  # valor de "Conferido (S/N)" fora de S/SIM/N/NAO
 
 
 def _json(valor: object) -> str:
@@ -129,7 +131,10 @@ def gravar_excel(relatorio: RelatorioAuditoria, caminho: Path) -> None:
 
 
 def ler_revisao(caminho: Path) -> ResumoRevisao:
-    """Lê a aba Amostra_revisao preenchida: N ou texto em Divergência = divergência; S = conferido; vazio = pendente."""
+    """Lê a aba Amostra_revisao preenchida.
+
+    Texto em Divergência, ou N/NÃO = divergência; S/SIM = conferido; vazio = pendente; outro valor = inválido.
+    """
     livro = load_workbook(caminho, read_only=True)
     try:
         linhas = list(livro["Amostra_revisao"].iter_rows(values_only=True))
@@ -137,20 +142,22 @@ def ler_revisao(caminho: Path) -> ResumoRevisao:
         livro.close()
     cabecalho = list(linhas[0])
     pos = {nome: cabecalho.index(nome) for nome in ("ID", "Conferido (S/N)", "Divergência")}
-    conferidos, divergencias, pendentes = [], [], []
+    conferidos, divergencias, pendentes, invalidos = [], [], [], []
     for linha in linhas[1:]:
         identificador = linha[pos["ID"]]
         if identificador is None:
             continue
-        conferido = str(linha[pos["Conferido (S/N)"]] or "").strip().upper()
+        conferido = normalizar_texto(str(linha[pos["Conferido (S/N)"]] or "")) or ""
         divergencia = str(linha[pos["Divergência"]] or "").strip()
-        if conferido == "N" or divergencia:
+        if conferido in {"N", "NAO"} or divergencia:
             divergencias.append(identificador)
-        elif conferido == "S":
+        elif conferido in {"S", "SIM"}:
             conferidos.append(identificador)
-        else:
+        elif not conferido:
             pendentes.append(identificador)
+        else:
+            invalidos.append(identificador)
     return ResumoRevisao(
-        arquivo=str(caminho), total=len(conferidos) + len(divergencias) + len(pendentes),
-        conferidos=conferidos, divergencias=divergencias, pendentes=pendentes,
+        arquivo=str(caminho), total=len(conferidos) + len(divergencias) + len(pendentes) + len(invalidos),
+        conferidos=conferidos, divergencias=divergencias, pendentes=pendentes, invalidos=invalidos,
     )

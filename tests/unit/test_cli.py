@@ -42,3 +42,12 @@ def test_cli_servidor_chama_uvicorn_com_a_factory(banco_teste: Path, monkeypatch
     assert kwargs == {"factory": True, "host": "127.0.0.1", "port": 9000, "reload": False}
     import os
     assert os.environ["ORCAMENTO_PECAS_DB"] == str(banco_teste)
+
+
+def test_cli_revisao_com_valor_invalido_sai_com_um(banco_teste: Path, tmp_path: Path):
+    main(["auditoria", "--banco", str(banco_teste), "--amostra", "3", "--saida", str(tmp_path)])
+    planilha = next(tmp_path.glob("auditoria_*.xlsx"))
+    livro = load_workbook(planilha)
+    livro["Amostra_revisao"].cell(row=2, column=list(COLUNAS_AMOSTRA).index("Conferido (S/N)") + 1, value="talvez")
+    livro.save(planilha)
+    assert main(["revisao", str(planilha)]) == 1

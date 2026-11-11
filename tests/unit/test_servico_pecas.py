@@ -132,3 +132,49 @@ def test_qtd_embalagem_ausente_gera_dado_ausente(servico):
     assert r.dados.qtd_embalagem.normalizado is None
     ausente = alerta(r, CodigoAlerta.DADO_AUSENTE)
     assert any(e.coluna == "QtdEmbalagem" for e in ausente.evidencias)
+
+
+# --- regressões da revisão final -------------------------------------------------------
+
+
+def test_por_veiculo_com_combustivel_mantem_conflito(servico):
+    """C1: o filtro de combustível não esconde o conflito do motor."""
+    r = servico.por_veiculo("kicks", 2018, combustivel="gasolina")
+    assert CodigoAlerta.COMBUSTIVEL_CONFLITANTE in r.revisao_humana.motivos
+
+
+def test_pecas_nao_encontradas_exigem_revisao(servico):
+    """I1: veículo encontrado, mas nenhuma peça com os filtros: alerta com as aplicações consultadas."""
+    r = servico.por_veiculo("sentra", 2015, grupo=39)
+    assert r.total == 0
+    vazio = alerta(r, CodigoAlerta.PECAS_NAO_ENCONTRADAS)
+    assert vazio.contexto["codigos_aplicacao"] == [34568, 34569]
+    assert vazio.contexto["grupo"] == 39
+    assert r.revisao_humana.necessaria is True
+
+
+def test_aplicacao_sem_pecas_exige_revisao(servico):
+    r = servico.da_aplicacao(34568)
+    assert r.dados == []
+    assert alerta(r, CodigoAlerta.PECAS_NAO_ENCONTRADAS).contexto["codigos_aplicacao"] == [34568]
+
+
+def test_preco_zerado_ou_negativo_e_suspeito(criar_banco):
+    """I3: preço ≤ 0 não é preço válido: alerta de revisão, sem PRECO_AUSENTE."""
+    from orcamento_pecas.dados.conexao import abrir_somente_leitura
+    from orcamento_pecas.dados.repositorio import Repositorio
+
+    banco = criar_banco(
+        "UPDATE PRODUTO SET PrecoProduto = 0 WHERE CodigoProduto = 5580;"
+        "UPDATE PRODUTO SET PrecoProduto = -1.5 WHERE CodigoProduto = 5581;"
+    )
+    conexao = abrir_somente_leitura(banco)
+    try:
+        repo = Repositorio(conexao)
+        r = ServicoPecas(repo, ServicoVeiculos(repo, FONTE), FONTE).da_aplicacao(15365)
+    finally:
+        conexao.close()
+    suspeito = alerta(r, CodigoAlerta.PRECO_SUSPEITO)
+    assert {(e.chave["CodigoProduto"], e.valor_original) for e in suspeito.evidencias} == {(5580, 0.0), (5581, -1.5)}
+    assert CodigoAlerta.PRECO_AUSENTE not in {a.codigo for a in r.alertas}
+    assert CodigoAlerta.PRECO_SUSPEITO in r.revisao_humana.motivos

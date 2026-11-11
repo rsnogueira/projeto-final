@@ -15,7 +15,7 @@ from orcamento_pecas.dominio.normalizacao import (
     numero_produto_base,
 )
 from orcamento_pecas.servicos.comum import ecoar_inteiro, ecoar_texto, montar_resposta
-from orcamento_pecas.servicos.veiculos import ServicoVeiculos, alertas_conflito_combustivel
+from orcamento_pecas.servicos.veiculos import ServicoVeiculos
 
 CAMPOS_NAO_INTERPRETADOS = ("CodigoSimilar", "CpoAuxProd5", "CpoAuxProd25", "PCs", "NumeroProdutoPesq")
 
@@ -54,6 +54,16 @@ def alertas_duplicidade(produtos: list[Produto]) -> list[Alerta]:
     )]
 
 
+def alertas_sem_pecas(produtos: list[Produto], codigos_aplicacao: list[int], grupo: int | None, texto: str | None) -> list[Alerta]:
+    """Veículo encontrado, mas nenhuma peça: a ausência afeta o orçamento e exige revisão."""
+    if produtos:
+        return []
+    return [criar_alerta(
+        CodigoAlerta.PECAS_NAO_ENCONTRADAS,
+        codigos_aplicacao=codigos_aplicacao, grupo=grupo, texto=normalizar_texto(texto),
+    )]
+
+
 class ServicoPecas:
     def __init__(self, repo: Repositorio, veiculos: ServicoVeiculos, fonte: Fonte) -> None:
         self.repo = repo
@@ -86,6 +96,8 @@ class ServicoPecas:
         preco = valor_de(linha, "PRODUTO", chave, "PrecoProduto", normalizar_preco(linha["PrecoProduto"]))
         if preco.normalizado is None:
             alertas.append(criar_alerta(CodigoAlerta.PRECO_AUSENTE, [preco.evidencia], **ctx))
+        elif preco.normalizado <= 0:
+            alertas.append(criar_alerta(CodigoAlerta.PRECO_SUSPEITO, [preco.evidencia], **ctx))
         qtd = valor_de(linha, "PRODUTO", chave, "QtdEmbalagem", _inteiro(linha["QtdEmbalagem"]))
         ausente(qtd, "PRODUTO.QtdEmbalagem")
 
@@ -125,6 +137,7 @@ class ServicoPecas:
         linhas = self.repo.listar_pecas_das_aplicacoes([codigo_aplicacao], grupo)
         produtos = self._produtos_das_linhas(linhas, texto)
         alertas = self._alertas_dos_produtos(produtos, linhas) + alertas_duplicidade(produtos)
+        alertas += alertas_sem_pecas(produtos, [codigo_aplicacao], grupo, texto)
         return montar_resposta(consulta, produtos, len(produtos), alertas, self.fonte)
 
     def por_veiculo(
@@ -148,7 +161,8 @@ class ServicoPecas:
         })
         pares, alertas = self.veiculos.resolver_aplicacoes(modelo, ano, fabricante, combustivel, chave_motor)
         aplicacoes, alertas_aplicacoes = self.veiculos.montar_aplicacoes(pares)
-        alertas += alertas_aplicacoes + alertas_conflito_combustivel(aplicacoes)
+        alertas += alertas_aplicacoes
+        alertas += self.veiculos.conflitos_no_contexto(aplicacoes, modelo, ano, fabricante, combustivel, chave_motor)
 
         primeira_por_chave: dict[str, Evidencia] = {}
         for linha, _ in pares:
@@ -167,6 +181,8 @@ class ServicoPecas:
         inicio = (pagina - 1) * limite
         pagina_produtos = produtos[inicio:inicio + limite]
         alertas += self._alertas_dos_produtos(pagina_produtos, linhas) + alertas_duplicidade(produtos)
+        if pares:
+            alertas += alertas_sem_pecas(produtos, sorted(linha["CodigoAplicacao"] for linha, _ in pares), grupo, texto)
         return montar_resposta(consulta, pagina_produtos, len(produtos), alertas, self.fonte, pagina, limite)
 
     def obter(self, codigo_produto: int) -> Resposta | None:

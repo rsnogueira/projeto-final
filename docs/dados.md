@@ -22,10 +22,10 @@ O valor original nunca é alterado. As regras abaixo só geram o valor normaliza
 | **Texto** | Maiúsculas, sem acentos, espaços colapsados. Texto vazio vira `null`. |
 | **Modelo** | A descrição é quebrada em `<br>` e `/`, gerando segmentos. Se um segmento for igual ao modelo ou começar por `modelo + espaço`, a correspondência é `inicio_segmento` (confiança alta). Se o modelo aparecer como palavras inteiras no meio de um segmento, é `palavra_interna` (confiança baixa, com alerta). `MARCH` não casa com `MARCHA`. |
 | **Modelo-base** (derivado) | A primeira palavra de cada segmento. Serve só para listar modelos disponíveis e montar a bateria da auditoria. Limitação: "GRAND LIVINA" gera "GRAND" (pendência P11). |
-| **Ano final** | Inteiro é usado como está. `''`, `NULL` ou texto vira `null`. A compatibilidade é `inicio ≤ ano ≤ fim`, com bordas inclusivas. Sem fim, vale `ano ≥ inicio` (decisão D2, com alerta). |
+| **Ano final** | Inteiro é usado como está. Texto de exatamente 4 dígitos (ex.: `'2014'`) vira o inteiro correspondente, e o original fica preservado. `''`, `NULL` ou outro texto vira `null`. A compatibilidade é `inicio ≤ ano ≤ fim`, com bordas inclusivas. Sem fim, vale `ano ≥ inicio` (decisão D2, com alerta). |
 | **FaixaAno** | Serve só para comparar com as colunas de ano. Formatos reconhecidos: `AAAA-AAAA`, `AAAA-...`, `AAAA-…`, `AAAA--` e `…-AAAA`. Qualquer diferença em relação às colunas gera `FAIXA_ANO_DIVERGENTE`. |
 | **Motorização** | Decomposta em códigos (o texto antes da cilindrada, separado por `/`, sem a palavra genérica "MOTOR"), cilindrada (`\d.\d`), válvulas (`NNV`), cilindros (`L4`, `L3`…) e comando (DOHC, SOHC, OHV). A chave é estrita: `códigos\|cilindrada\|válvulas\|cilindros\|comando`, com `?` em cada atributo ausente. `HR16` e `HR16DE` **não** se juntam. |
-| **Preço** | `Decimal` exato a partir do número, sem arredondar. `NULL` vira `null`, com `PRECO_AUSENTE`. |
+| **Preço** | `Decimal` exato a partir do número, sem arredondar. `NULL` vira `null`, com `PRECO_AUSENTE`. Preço ≤ 0 mantém o valor, mas gera `PRECO_SUSPEITO`. |
 | **Número-base** | O número sem o prefixo literal `#NAC_`. É usado **apenas** para detectar possível duplicidade. |
 
 Exemplos de motorização. Os 29 textos distintos da base estão fixados em `tests/unit/test_motorizacao.py`.

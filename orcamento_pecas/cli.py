@@ -67,4 +67,4 @@ def main(argv: list[str] | None = None) -> int:
 
     resumo_revisao = ler_revisao(Path(args.arquivo))
     print(resumo_revisao.model_dump_json(indent=2))
-    return 1 if resumo_revisao.divergencias else 0
+    return 1 if resumo_revisao.divergencias or resumo_revisao.invalidos else 0

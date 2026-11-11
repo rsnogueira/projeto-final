@@ -97,3 +97,17 @@ def test_produto_repetido_vira_falha_I6(repo, pecas):
     resposta = pecas.da_aplicacao(35368)
     resposta.dados.append(resposta.dados[0])
     assert "I6" in invariantes(auditar_resposta(resposta, repo))
+
+
+def test_evidencia_de_alerta_adulterada_vira_falha_I1(repo, veiculos):
+    """M4: as evidências citadas nos alertas também são relidas na base."""
+    resposta = veiculos.obter(31393)
+    alerta = next(a for a in resposta.alertas if a.codigo == CodigoAlerta.ANO_FIM_AUSENTE)
+    alerta.evidencias[0] = alerta.evidencias[0].model_copy(update={"valor_original": "2010"})
+    assert "I1" in invariantes(auditar_resposta(resposta, repo))
+
+
+def test_aplicacao_com_combustivel_fora_do_filtro_vira_falha_I5(repo, veiculos):
+    resposta = veiculos.motorizacoes("kicks", 2018, combustivel="flex")
+    assert auditar_resposta(resposta, repo, {"modelo": "kicks", "ano": 2018, "combustivel": "flex"}) == []
+    assert "I5" in invariantes(auditar_resposta(resposta, repo, {"modelo": "kicks", "ano": 2018, "combustivel": "gasolina"}))

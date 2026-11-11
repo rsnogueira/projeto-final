@@ -34,7 +34,13 @@ def _exibir(normalizado: Any) -> str | None:
 def _executar(consulta: Consulta, veiculos: ServicoVeiculos, pecas: ServicoPecas) -> tuple[Resposta | None, dict[str, Any]]:
     p = consulta.parametros
     if consulta.tipo == "motorizacoes":
-        return veiculos.motorizacoes(p["modelo"], p["ano"]), dict(p)
+        return veiculos.motorizacoes(p["modelo"], p["ano"], combustivel=p.get("combustivel")), dict(p)
+    if consulta.tipo == "pecas_por_veiculo":
+        return pecas.por_veiculo(p["modelo"], p["ano"], chave_motor=p.get("chave_motor"), combustivel=p.get("combustivel")), {}
+    if consulta.tipo == "aplicacao":
+        return veiculos.obter(p["codigo_aplicacao"]), {}
+    if consulta.tipo == "busca_veiculos":
+        return veiculos.buscar(modelo=p["modelo"]), dict(p)
     if consulta.tipo == "combustiveis":
         return veiculos.combustiveis(p["modelo"], p["ano"]), dict(p)
     if consulta.tipo == "pecas_da_aplicacao":

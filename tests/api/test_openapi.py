@@ -52,3 +52,12 @@ def test_swagger_disponivel(cliente):
     resposta = cliente.get("/docs")
     assert resposta.status_code == 200
     assert "swagger" in resposta.text.lower()
+
+
+def test_modelos_principais_tem_exemplos_reais(cliente):
+    """I5: o Swagger mostra exemplos (valores reais da base) nos componentes das respostas."""
+    componentes = cliente.get("/openapi.json").json()["components"]["schemas"]
+    for nome in ("Evidencia", "Alerta", "RevisaoHumana", "Fonte", "ParametroEcoado", "MotorNormalizado", "DadosSaude"):
+        assert componentes[nome].get("examples"), nome
+    rastreados = [n for n in componentes if n.startswith("ValorRastreado")]
+    assert rastreados and all(componentes[n].get("examples") for n in rastreados)

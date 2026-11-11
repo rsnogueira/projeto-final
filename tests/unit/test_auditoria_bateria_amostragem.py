@@ -60,3 +60,27 @@ def test_sql_de_conferencia_devolve_o_valor_original(conexao_teste):
     sql = sql_conferencia(evidencia)
     assert sql == 'SELECT "AnoFimFabricacao" FROM "APLICACAO" WHERE "CodigoAplicacao" = 31393;'
     assert conexao_teste.execute(sql).fetchone()[0] == ""
+
+
+def test_bateria_cobre_o_caminho_do_chatbot_e_os_filtros(repo):
+    """I4: /v1/pecas por veículo, por chave de motor e por combustível; filtro de combustível em motorizações;
+    detalhe de aplicação e busca de veículos."""
+    bateria = gerar_bateria(repo)
+    esperadas = [
+        Consulta(tipo="pecas_por_veiculo", parametros={"modelo": "FRONTIER", "ano": 2008}),
+        Consulta(tipo="pecas_por_veiculo", parametros={"modelo": "FRONTIER", "ano": 2008, "chave_motor": "YD25ETI|2.5|16V|L4|DOHC"}),
+        Consulta(tipo="motorizacoes", parametros={"modelo": "KICKS", "ano": 2018, "combustivel": "GASOLINA"}),
+        Consulta(tipo="pecas_por_veiculo", parametros={"modelo": "KICKS", "ano": 2018, "combustivel": "GASOLINA"}),
+        Consulta(tipo="aplicacao", parametros={"codigo_aplicacao": 35368}),
+        Consulta(tipo="busca_veiculos", parametros={"modelo": "FRONTIER"}),
+    ]
+    for consulta in esperadas:
+        assert consulta in bateria, consulta
+
+
+def test_rotas_das_novas_consultas():
+    assert Consulta(tipo="pecas_por_veiculo", parametros={"modelo": "FRONTIER", "ano": 2008, "chave_motor": "YD25ETI|2.5|16V|L4|DOHC"}).rota() == (
+        "GET /v1/pecas?modelo=FRONTIER&ano=2008&chave_motor=YD25ETI%7C2.5%7C16V%7CL4%7CDOHC"
+    )
+    assert Consulta(tipo="aplicacao", parametros={"codigo_aplicacao": 35368}).rota() == "GET /v1/veiculos/35368"
+    assert Consulta(tipo="busca_veiculos", parametros={"modelo": "FRONTIER"}).rota() == "GET /v1/veiculos?modelo=FRONTIER"

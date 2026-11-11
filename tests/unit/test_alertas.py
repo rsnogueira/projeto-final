@@ -41,3 +41,10 @@ def test_revisao_necessaria_somente_com_alerta_de_revisao():
     ])
     assert resultado.necessaria is True
     assert resultado.motivos == [CodigoAlerta.PRECO_AUSENTE, CodigoAlerta.ANO_FIM_AUSENTE]
+
+
+def test_severidades_ajustadas_na_revisao_final():
+    assert criar_alerta(CodigoAlerta.CORRESPONDENCIA_PARCIAL_MODELO).severidade == "revisao"
+    assert criar_alerta(CodigoAlerta.DADO_AUSENTE).severidade == "revisao"
+    assert criar_alerta(CodigoAlerta.PECAS_NAO_ENCONTRADAS).severidade == "revisao"
+    assert criar_alerta(CodigoAlerta.PRECO_SUSPEITO).severidade == "revisao"

@@ -16,6 +16,9 @@ TabelaBase = Literal["APLICACAO", "FABRICANTE", "GRUPOPRODUTO", "PRODUTO", "PROD
 Severidade = Literal["info", "atencao", "revisao"]
 ValorPrimitivo = str | int | float | None
 
+# Exemplos do Swagger: valores REAIS da base (2026-11-10), nunca inventados.
+_EXEMPLO_EVIDENCIA = {"tabela": "APLICACAO", "chave": {"CodigoAplicacao": 31393}, "coluna": "AnoFimFabricacao", "valor_original": ""}
+
 
 class CodigoAlerta(StrEnum):
     # exigem revisão humana
@@ -27,6 +30,8 @@ class CodigoAlerta(StrEnum):
     MOTORIZACAO_NAO_INTERPRETADA = "MOTORIZACAO_NAO_INTERPRETADA"
     COMBUSTIVEL_CONFLITANTE = "COMBUSTIVEL_CONFLITANTE"
     PRECO_AUSENTE = "PRECO_AUSENTE"
+    PRECO_SUSPEITO = "PRECO_SUSPEITO"
+    PECAS_NAO_ENCONTRADAS = "PECAS_NAO_ENCONTRADAS"
     POSSIVEL_PRODUTO_DUPLICADO = "POSSIVEL_PRODUTO_DUPLICADO"
     VINCULO_ORFAO = "VINCULO_ORFAO"
     REFERENCIA_INEXISTENTE = "REFERENCIA_INEXISTENTE"
@@ -45,7 +50,7 @@ class CodigoAlerta(StrEnum):
 
 
 class Evidencia(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra={"examples": [_EXEMPLO_EVIDENCIA]})
 
     tabela: TabelaBase
     chave: dict[str, int] = Field(description="Chave do registro na tabela (ex.: {'CodigoAplicacao': 35368}).")
@@ -54,12 +59,22 @@ class Evidencia(BaseModel):
 
 
 class ValorRastreado(BaseModel, Generic[T]):
+    model_config = ConfigDict(json_schema_extra={"examples": [
+        {"original": "", "normalizado": None, "evidencia": _EXEMPLO_EVIDENCIA},
+    ]})
+
     original: ValorPrimitivo = Field(description="Valor exatamente como está na base.")
     normalizado: T | None = Field(description="Valor normalizado; null quando ausente ou não interpretável.")
     evidencia: Evidencia
 
 
 class Alerta(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"examples": [{
+        "codigo": "ANO_FIM_AUSENTE", "severidade": "revisao",
+        "mensagem": "Ano final de fabricação ausente na base; a aplicação foi considerada compatível a partir do ano inicial.",
+        "evidencias": [_EXEMPLO_EVIDENCIA], "contexto": {"codigos_aplicacao": [31393]},
+    }]})
+
     codigo: CodigoAlerta
     severidade: Severidade = Field(description="info, atencao ou revisao (revisao exige revisão humana).")
     mensagem: str
@@ -68,16 +83,25 @@ class Alerta(BaseModel):
 
 
 class RevisaoHumana(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"examples": [{"necessaria": True, "motivos": ["ANO_FIM_AUSENTE", "MOTORIZACAO_COMPOSTA"]}]})
+
     necessaria: bool
     motivos: list[CodigoAlerta]
 
 
 class ParametroEcoado(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"examples": [{"original": "frontier", "normalizado": "FRONTIER"}]})
+
     original: str | int | None
     normalizado: str | int | None
 
 
 class Fonte(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"examples": [{
+        "banco": "Database/SQLite/db_proj_final.db",
+        "sha256": "8a700b84124cefe12332e115d73da458f29082d57d627f5c5b0b8064b9d7cd2a",
+    }]})
+
     banco: str = Field(description="Caminho do arquivo SQLite consultado.")
     sha256: str = Field(description="SHA-256 do arquivo no momento da partida do serviço.")
 
@@ -97,7 +121,10 @@ class Correspondencia(BaseModel):
 class MotorNormalizado(BaseModel):
     """Motorização decomposta em atributos. Ausente = null; nada é completado."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra={"examples": [{
+        "codigos": ["M9T"], "cilindrada_l": "2.3", "valvulas": 16, "cilindros": "L4", "comando": "DOHC",
+        "interpretada": True, "chave": "M9T|2.3|16V|L4|DOHC",
+    }]})
 
     codigos: list[str] = Field(description="Códigos de motor antes da cilindrada (vários = motorização composta).")
     cilindrada_l: str | None = Field(description="Cilindrada em litros, como texto exato (ex.: '2.5').")
@@ -198,6 +225,13 @@ class ItemGrupoProduto(BaseModel):
 
 
 class DadosSaude(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"examples": [{
+        "status": "ok", "banco": "Database/SQLite/db_proj_final.db", "somente_leitura": True,
+        "sha256": "8a700b84124cefe12332e115d73da458f29082d57d627f5c5b0b8064b9d7cd2a",
+        "contagens": {"APLICACAO": 131, "FABRICANTE": 12, "GRUPOPRODUTO": 27, "PRODUTO": 5944,
+                      "PRODUTO_APLICACAO": 1438, "TIPOAPLICACAO": 9},
+    }]})
+
     status: Literal["ok"]
     banco: str
     somente_leitura: bool

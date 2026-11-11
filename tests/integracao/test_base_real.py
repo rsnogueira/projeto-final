@@ -104,3 +104,20 @@ def test_v8_pecas_por_chave_de_motor(cliente):
     assert sorted(p["codigo_produto"] for p in corpo["dados"]) == [6809, 6810, 6811, 11837, 11838, 11839]
     assert "MOTOR_NAO_IDENTIFICADO" not in {a["codigo"] for a in corpo["alertas"]}
     assert corpo["revisao_humana"]["motivos"] == ["PRECO_AUSENTE", "POSSIVEL_PRODUTO_DUPLICADO"]
+
+
+def test_v9_kicks_gasolina_mantem_conflito_e_sinaliza_lista_vazia(cliente):
+    """Regressão C1 + I1 (revisão final): o filtro de combustível não esconde o conflito; lista vazia tem alerta."""
+    corpo = cliente.get("/v1/pecas", params={"modelo": "kicks", "ano": 2018, "combustivel": "gasolina", "grupo": 39}).json()
+    assert corpo["total"] == 0
+    assert {"COMBUSTIVEL_CONFLITANTE", "PECAS_NAO_ENCONTRADAS"} <= set(corpo["revisao_humana"]["motivos"])
+    motor = cliente.get("/v1/veiculos/motorizacoes", params={"modelo": "kicks", "ano": 2018, "combustivel": "gasolina"}).json()
+    assert motor["dados"]["identificado"] is True
+    assert "COMBUSTIVEL_CONFLITANTE" in motor["revisao_humana"]["motivos"]
+
+
+def test_v10_pathfinder_2015_sem_bronzina_e_sinalizado(cliente):
+    """Regressão I1 (revisão final): motor único, mas nenhuma bronzina vinculada."""
+    corpo = cliente.get("/v1/pecas", params={"modelo": "pathfinder", "ano": 2015, "grupo": 39}).json()
+    assert corpo["total"] == 0
+    assert "PECAS_NAO_ENCONTRADAS" in corpo["revisao_humana"]["motivos"]

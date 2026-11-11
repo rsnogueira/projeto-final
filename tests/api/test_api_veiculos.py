@@ -88,3 +88,18 @@ def test_codigos_inexistentes_retornam_404(cliente):
 
 def test_codigo_nao_numerico_retorna_422(cliente):
     assert cliente.get("/v1/veiculos/abc").status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("rota", "parametros"),
+    [
+        ("/v1/veiculos/99999999999999999999", {}),
+        ("/v1/veiculos/0", {}),
+        ("/v1/pecas/99999999999999999999", {}),
+        ("/v1/veiculos/35368/pecas", {"grupo": "99999999999999999999"}),
+        ("/v1/pecas", {"modelo": "frontier", "ano": 2008, "grupo": "99999999999999999999"}),
+    ],
+)
+def test_inteiros_fora_da_faixa_retornam_422(cliente, rota, parametros):
+    """M1: inteiros que o SQLite não comporta não podem virar erro 500."""
+    assert cliente.get(rota, params=parametros).status_code == 422

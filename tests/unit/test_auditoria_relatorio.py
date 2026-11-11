@@ -66,3 +66,19 @@ def test_ler_revisao_conta_conferidos_e_divergencias(auditoria):
     assert resumo.conferidos == ["A01", "A03"]
     assert resumo.divergencias == ["A02"]
     assert resumo.pendentes == [f"A{n:02d}" for n in range(4, 11)]
+
+
+def test_ler_revisao_aceita_sim_nao_e_aponta_valores_invalidos(auditoria):
+    """M2: "Não" sem texto em Divergência é divergência; "Sim" é conferido; outro valor é inválido."""
+    _, _, caminho_excel = auditoria
+    livro = load_workbook(caminho_excel)
+    aba = livro["Amostra_revisao"]
+    coluna = list(COLUNAS_AMOSTRA).index("Conferido (S/N)") + 1
+    for linha, valor in ((2, "Sim"), (3, "Não"), (4, "nao"), (5, "talvez")):
+        aba.cell(row=linha, column=coluna, value=valor)
+    livro.save(caminho_excel)
+    resumo = ler_revisao(caminho_excel)
+    assert resumo.conferidos == ["A01"]
+    assert resumo.divergencias == ["A02", "A03"]
+    assert resumo.invalidos == ["A04"]
+    assert resumo.pendentes == [f"A{n:02d}" for n in range(5, 11)]

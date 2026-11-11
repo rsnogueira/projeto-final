@@ -26,7 +26,7 @@ from orcamento_pecas.dominio.modelos import (
     Resposta,
     ValorRastreado,
 )
-from orcamento_pecas.dominio.normalizacao import ano_compativel, corresponde_modelo
+from orcamento_pecas.dominio.normalizacao import ano_compativel, corresponde_modelo, normalizar_texto
 from orcamento_pecas.servicos.pecas import ServicoPecas, alertas_duplicidade
 from orcamento_pecas.servicos.veiculos import ServicoVeiculos
 
@@ -75,23 +75,34 @@ def auditar_resposta(resposta: Resposta, repo: Repositorio, filtros: dict[str, A
 
     pares = list(valores_rastreados(resposta.dados))
 
-    # I1: a evidência relida na base confere com o original
+    # I1: a evidência relida na base confere com o original (valores e evidências citadas nos alertas)
     relidos: dict[str, tuple[bool, object]] = {}
-    for caminho, valor in pares:
-        evidencia = valor.evidencia
-        if not _mesmo_valor(evidencia.valor_original, valor.original):
-            falha("I1", f"{caminho}: original {valor.original!r} difere da evidência {evidencia.valor_original!r}", evidencia)
+
+    def reler(evidencia: Evidencia) -> tuple[bool, object]:
         chave = evidencia.model_dump_json()
         if chave not in relidos:
             try:
                 relidos[chave] = (True, repo.ler_valor(evidencia.tabela, evidencia.chave, evidencia.coluna))
             except (RegistroInexistenteError, IdentificadorNaoPermitidoError) as erro:
                 relidos[chave] = (False, str(erro))
-        encontrado, atual = relidos[chave]
+        return relidos[chave]
+
+    for caminho, valor in pares:
+        evidencia = valor.evidencia
+        if not _mesmo_valor(evidencia.valor_original, valor.original):
+            falha("I1", f"{caminho}: original {valor.original!r} difere da evidência {evidencia.valor_original!r}", evidencia)
+        encontrado, atual = reler(evidencia)
         if not encontrado:
             falha("I1", f"{caminho}: {atual}", evidencia)
         elif not _mesmo_valor(atual, valor.original):
             falha("I1", f"{caminho}: base {atual!r} ≠ resposta {valor.original!r}", evidencia)
+    for alerta in resposta.alertas:
+        for evidencia in alerta.evidencias:
+            encontrado, atual = reler(evidencia)
+            if not encontrado:
+                falha("I1", f"alerta {alerta.codigo.value}: {atual}", evidencia)
+            elif not _mesmo_valor(atual, evidencia.valor_original):
+                falha("I1", f"alerta {alerta.codigo.value}: base {atual!r} ≠ evidência {evidencia.valor_original!r}", evidencia)
 
     # I2: normalizado null precisa de alerta citando a evidência
     citadas = {e.model_dump_json() for alerta in resposta.alertas for e in alerta.evidencias}
@@ -116,12 +127,15 @@ def auditar_resposta(resposta: Resposta, repo: Repositorio, filtros: dict[str, A
     # I5: aplicações satisfazem os filtros (rechecado a partir dos valores originais)
     filtros = filtros or {}
     modelo, ano = filtros.get("modelo"), filtros.get("ano")
+    combustivel = normalizar_texto(filtros.get("combustivel"))
     for aplicacao in _aplicacoes(dados):
         if modelo and corresponde_modelo(aplicacao.descricao.original, modelo) is None:
             falha("I5", f"aplicação {aplicacao.codigo_aplicacao} não corresponde ao modelo {modelo!r}", aplicacao.descricao.evidencia)
         inicio, fim = aplicacao.ano_inicio.normalizado, aplicacao.ano_fim.normalizado
         if ano is not None and (inicio is None or not ano_compativel(ano, inicio, fim)):
             falha("I5", f"aplicação {aplicacao.codigo_aplicacao} não cobre o ano {ano}", aplicacao.ano_inicio.evidencia)
+        if combustivel and aplicacao.combustivel.normalizado != combustivel:
+            falha("I5", f"aplicação {aplicacao.codigo_aplicacao} não é {combustivel}", aplicacao.combustivel.evidencia)
 
     # I6: listagens sem repetição e com total coerente
     if isinstance(dados, list):

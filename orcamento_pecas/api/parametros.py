@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import Path, Query
 
 _TEM_TEXTO = r"\S"  # pelo menos um caractere que não seja espaço
+MAIOR_INTEIRO_SQLITE = 2**63 - 1  # acima disso o sqlite3 lança OverflowError (seria erro 500)
 
 Modelo = Annotated[str, Query(
     description="Modelo do veículo como o comprador escreveu (ex.: frontier). Comparado sem acentos e sem diferenciar "
@@ -28,12 +29,13 @@ ChaveMotor = Annotated[str | None, Query(
     examples=["YD25ETI|2.5|16V|L4|DOHC"],
 )]
 Grupo = Annotated[int | None, Query(
+    ge=1, le=MAIOR_INTEIRO_SQLITE,
     description="Código do grupo de produto (ver /v1/grupos-produto). Ex.: 39 = BRONZINA.", examples=[39],
 )]
 Texto = Annotated[str | None, Query(
     description="Palavras que devem aparecer inteiras na descrição da peça (ex.: mancal std).", examples=["mancal"],
 )]
-Pagina = Annotated[int, Query(ge=1, description="Página, começando em 1.", examples=[1])]
+Pagina = Annotated[int, Query(ge=1, le=MAIOR_INTEIRO_SQLITE, description="Página, começando em 1.", examples=[1])]
 Limite = Annotated[int, Query(ge=1, le=200, description="Itens por página (padrão 50, máximo 200).", examples=[50])]
-CodigoAplicacao = Annotated[int, Path(description="Código da aplicação (APLICACAO.CodigoAplicacao).", examples=[35368])]
-CodigoProduto = Annotated[int, Path(description="Código do produto (PRODUTO.CodigoProduto).", examples=[6809])]
+CodigoAplicacao = Annotated[int, Path(ge=1, le=MAIOR_INTEIRO_SQLITE, description="Código da aplicação (APLICACAO.CodigoAplicacao).", examples=[35368])]
+CodigoProduto = Annotated[int, Path(ge=1, le=MAIOR_INTEIRO_SQLITE, description="Código do produto (PRODUTO.CodigoProduto).", examples=[6809])]
