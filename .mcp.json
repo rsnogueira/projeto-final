@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "fipex": {
+      "type": "http",
+      "url": "https://api.fipex.com.br/mcp"
+    }
+  }
+}
